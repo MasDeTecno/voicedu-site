@@ -9,12 +9,6 @@ function json(data: any, init?: ResponseInit) {
   return new Response(JSON.stringify(data), { ...init, headers });
 }
 
-function basicAuth(key?: string, secret?: string) {
-  if (!key || !secret) return '';
-  const token = btoa(`${key}:${secret}`);
-  return `Basic ${token}`;
-}
-
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') return json({ ok: true });
   try {
@@ -23,14 +17,16 @@ export default async function handler(req: Request) {
     const language = (searchParams.get('language') || '').toLowerCase();
     const state = (searchParams.get('state') || '').toLowerCase();
 
-    const auth = basicAuth(process.env.UBERDUCK_API_KEY, process.env.UBERDUCK_API_SECRET);
-    if (!auth) return json({ error: 'Missing Uberduck credentials' }, { status: 500 });
+    const key = process.env.UBERDUCK_API_KEY;
+    if (!key) return json({ error: 'Missing UBERDUCK_API_KEY' }, { status: 500 });
 
     const udUrl = 'https://api.uberduck.ai/voices';
-    const res = await fetch(udUrl, { headers: { Authorization: auth } });
+    const res = await fetch(udUrl, {
+      headers: { Authorization: `Bearer ${key}` }
+    });
 
     if (!res.ok) {
-      // Fallback mock to validate UI quickly
+      // Fallback mock so the UI at least shows something
       return json([
         { id: 'es_female_1', name: 'ES Femenina', language: 'spanish', sampleUrl: '', tags: ['celebrity'], state: 'ready' },
         { id: 'en_male_1', name: 'EN Male', language: 'english', sampleUrl: '', tags: ['narration'], state: 'ready' }
@@ -48,9 +44,9 @@ export default async function handler(req: Request) {
         tags: (v?.tags || v?.category || []).map((x: any)=>String(x).toLowerCase()),
         state: (v?.state || 'ready').toLowerCase()
       }))
-      .filter(v => language ? v.language.includes(language) : true)
-      .filter(v => tag ? JSON.stringify(v.tags||[]).includes(tag) : true)
-      .filter(v => state ? v.state.includes(state) : true)
+      .filter(v => (language ? v.language.includes(language) : true))
+      .filter(v => (tag ? JSON.stringify(v.tags||[]).includes(tag) : true))
+      .filter(v => (state ? v.state.includes(state) : true))
       .filter(v => v.language.includes('english') || v.language.includes('spanish'))
       .slice(0, 120);
 
